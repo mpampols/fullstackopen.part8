@@ -1,4 +1,23 @@
-const { ApolloServer, gql } = require('apollo-server')
+const { ApolloServer, UserInputError, gql } = require('apollo-server')
+const jwt = require('jsonwebtoken')
+const JWT_SECRET = 'NEED_HERE_A_SECRET_KEY'
+
+const mongoose = require('mongoose')
+const Author = require('./models/author')
+const Book = require('./models/book')
+const User = require('./models/user')
+
+const MONGODB_URI='mongodb://fullstack:vlSUbi9ajzskfiTw@cluster0-shard-00-00.zdvdp.mongodb.net:27017,cluster0-shard-00-01.zdvdp.mongodb.net:27017,cluster0-shard-00-02.zdvdp.mongodb.net:27017/test?ssl=true&replicaSet=atlas-jplkes-shard-0&authSource=admin&retryWrites=true&w=majority'
+
+console.log('connecting to', MONGODB_URI)
+
+mongoose.connect(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => {
+    console.log('connected to MongoDB')
+  })
+  .catch((error) => {
+    console.log('error connection to MongoDB:', error.message)
+  })
 
 let authors = [
   {
@@ -89,11 +108,22 @@ let books = [
 ]
 
 const typeDefs = gql`
+  type User {
+    username: String!
+    favoriteGenre: String!
+    id: ID!
+  }
+
+  type Token {
+    value: String!
+  }
+
   type Book {
     title: String!
-    author: String!
     published: Int!
-    genres: [String]!
+    author: Author!
+    genres: [String!]!
+    id: ID!
   }
 
   type Author {
@@ -108,6 +138,7 @@ const typeDefs = gql`
     allBooks(author: String, genre: String): [Book!]!
     allAuthors: [Author!]
     authorCount: Int!
+    me: User
   }
 
   type Mutation {
@@ -124,57 +155,126 @@ const typeDefs = gql`
       name: String!
       setBornTo: Int!
     ): Author
+  
+    createUser(
+      username: String!
+      favoriteGenre: String!
+    ): User
+  
+    login(
+      username: String!
+      password: String!
+    ): Token
   }
 `
 
 const resolvers = {
   Query: {
-    bookCount: () => books.length,
+    bookCount: () => Book.collection.countDocuments(),
     allBooks: (root, args) => {
-      let filteredBooks = books
-      if (args.author)
-        filteredBooks = books.filter(book => book.author === args.author)
-      if (args.genre)
-        filteredBooks = filteredBooks.filter(book => book.genres.indexOf(args.genre) > -1)
-      return filteredBooks
+      return Books.find({})
     },
     allAuthors: (root, args) => {
-      return authors
+      return Author.find({})
     },
-    authorCount: () => authors.length
+    authorCount: () => Author.collection.countDocuments(),
+    me: (root, args, context) => {
+      return context.currentUser
+    }
   },
 
   Author: {
     bookCount: (root) => {
-      return books.filter(book => book.author === root.name).length
+      return Book.find({
+         author: { $in: root.name }
+      }).countDocuments()
     }
   },
 
   Mutation: {
-    addBook: (root, args) => {
-      books = books.concat(args)
-      if (authors.find(author => author.name === args.author) === undefined) {
-        authors = authors.concat({
-          name: args.author,
-          id: null,
-          born: null
+    addBook: async (root, args) => {
+      const book = new Book({ ...args })
+
+      const currentUser = context.currentUser
+
+      if (!currentUser) {
+        throw new AuthenticationError("not authenticated")
+      }
+  
+      try {
+        await book.save()
+      } catch (error) {
+        throw new UserInputError(error.message, {
+          invalidArgs: args,
         })
       }
-      return args
+      return book
     },
-    editAuthor: (root, args) => {
-      const author = authors.find(author => author.name === args.name)
-      if (author) {
-        author.born = args.setBornTo
+    editAuthor: async (root, args) => {
+      const author = await Author.findOne({ name: args.name })
+
+      const currentUser = context.currentUser
+
+      if (!currentUser) {
+        throw new AuthenticationError("not authenticated")
       }
+
+      if (!author) {
+        return null
+      }
+      
+      author.born = args.setBornTo
+
+      try {
+        await author.save()
+      } catch (error) {
+        throw new UserInputError(error.message, {
+          invalidArgs: args,
+        })
+      }
+
       return author
-    }
+    },
+    createUser: (root, args) => {
+      const user = new User({ username: args.username })
+  
+      return user.save()
+        .catch(error => {
+          throw new UserInputError(error.message, {
+            invalidArgs: args,
+          })
+        })
+    },
+    login: async (root, args) => {
+      const user = await User.findOne({ username: args.username })
+  
+      if ( !user || args.password !== 'secret' ) {
+        throw new UserInputError("wrong credentials")
+      }
+  
+      const userForToken = {
+        username: user.username,
+        id: user._id,
+      }
+  
+      return { value: jwt.sign(userForToken, JWT_SECRET) }
+    },
   }
 }
 
 const server = new ApolloServer({
   typeDefs,
-  resolvers
+  resolvers,
+  context: async ({ req }) => {
+    const auth = req ? req.headers.authorization : null
+    if (auth && auth.toLowerCase().startsWith('bearer ')) {
+      const decodedToken = jwt.verify(
+        auth.substring(7), JWT_SECRET
+      )
+      const currentUser = await User.findById(decodedToken.id)
+      return { currentUser }
+    }
+  }
 })
 
 server.listen().then(({ url }) => {
