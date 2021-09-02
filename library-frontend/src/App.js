@@ -6,6 +6,19 @@ import NewBook from './components/NewBook'
 
 const App = () => {
   const [page, setPage] = useState('authors')
+  const [token, setToken] = useState(null)
+
+  if (!token) {
+    return (
+      <div>
+        <h2>Login</h2>
+        <LoginForm
+          setToken={setToken}
+          setError={notify}
+        />
+      </div>
+    )
+  }
 
   return (
     <div>
