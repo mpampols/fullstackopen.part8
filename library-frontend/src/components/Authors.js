@@ -23,8 +23,8 @@ export const EDIT_AUTHOR = gql`
 
 const Authors = (props) => {
   const result = useQuery(ALL_AUTHORS)
-  const [name, setName] = useState('')
   const [born, setBorn] = useState('')
+  const [selectedOption, setSelectedOption] = useState(null);
 
   const [ editAuthor ] = useMutation(EDIT_AUTHOR, {
     refetchQueries: [ { query: ALL_AUTHORS } ]
@@ -32,7 +32,7 @@ const Authors = (props) => {
 
   const submitEdit = async (event) => {
     event.preventDefault()
-
+    const name = selectedOption.value
     editAuthor({
       variables: {
         name,
@@ -50,6 +50,10 @@ const Authors = (props) => {
   }
 
   const authors = result.data.allAuthors
+
+  const selectAuthorOptions = authors.map((author) => (
+    { value: author.name, label: author.name }
+  ))
 
   return (
     <div>
@@ -77,10 +81,11 @@ const Authors = (props) => {
       <h2>Set birthday</h2>
       <form onSubmit={submitEdit}>
         <div>
-          Name
-          <input
-            value={name}
-            onChange={ ({ target }) => setName(target.value) }
+          Author
+          <Select
+            defaultValue={selectedOption}
+            onChange={setSelectedOption}
+            options={selectAuthorOptions}
           />
         </div>
         <div>
