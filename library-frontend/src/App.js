@@ -37,6 +37,8 @@ const App = () => {
     client.resetStore()
   }
 
+  console.log(token)
+  
   if (!token) {
     return (
       <div>
