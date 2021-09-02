@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react'
-import { useMutation } from '@apollo/client'
-import { LOGIN } from '../queries'
+import { gql, useMutation } from '@apollo/client'
+
+export const LOGIN = gql`
+  mutation login($username: String!, $password: String!) {
+    login(username: $username, password: $password)  {
+      value
+    }
+  }
+`
 
 const LoginForm = ({ setError, setToken }) => {
   const [username, setUsername] = useState('')
@@ -16,7 +23,7 @@ const LoginForm = ({ setError, setToken }) => {
     if ( result.data ) {
       const token = result.data.login.value
       setToken(token)
-      localStorage.setItem('phonenumbers-user-token', token)
+      localStorage.setItem('library-user-token', token)
     }
   }, [result.data]) // eslint-disable-line
 

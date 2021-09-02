@@ -1,3 +1,5 @@
+require('dotenv').config()
+
 const { ApolloServer, UserInputError, gql } = require('apollo-server')
 const jwt = require('jsonwebtoken')
 const JWT_SECRET = 'NEED_HERE_A_SECRET_KEY'
@@ -7,17 +9,18 @@ const Author = require('./models/author')
 const Book = require('./models/book')
 const User = require('./models/user')
 
-const MONGODB_URI='mongodb://fullstack:vlSUbi9ajzskfiTw@cluster0-shard-00-00.zdvdp.mongodb.net:27017,cluster0-shard-00-01.zdvdp.mongodb.net:27017,cluster0-shard-00-02.zdvdp.mongodb.net:27017/test?ssl=true&replicaSet=atlas-jplkes-shard-0&authSource=admin&retryWrites=true&w=majority'
+const url = process.env.MONGODB_URI
 
-console.log('connecting to', MONGODB_URI)
-
-mongoose.connect(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => {
-    console.log('connected to MongoDB')
-  })
-  .catch((error) => {
-    console.log('error connection to MongoDB:', error.message)
-  })
+mongoose.set('useFindAndModify', false)
+mongoose.set('useCreateIndex', true)
+mongoose.connect(url, {
+  useNewUrlParser: true,
+  useFindAndModify: false
+}).then(() => {
+  console.log('connected to MongoDB')
+}).catch((error) => {
+  console.log('error connecting to MongoDB:', error.message)
+})
 
 let authors = [
   {
@@ -128,15 +131,15 @@ const typeDefs = gql`
 
   type Author {
     name: String!
-    id: String!
+    id: ID!
     born: Int
-    bookCount: Int
+    bookCount: Int!
   }
 
   type Query {
     bookCount: Int!
     allBooks(author: String, genre: String): [Book!]!
-    allAuthors: [Author!]
+    allAuthors: [Author!]!
     authorCount: Int!
     me: User
   }
@@ -148,9 +151,7 @@ const typeDefs = gql`
       published: Int!
       genres: [String!]
     ): Book
-  }
-
-  type Mutation {
+  
     editAuthor(
       name: String!
       setBornTo: Int!
@@ -167,15 +168,17 @@ const typeDefs = gql`
     ): Token
   }
 `
-
 const resolvers = {
   Query: {
     bookCount: () => Book.collection.countDocuments(),
-    allBooks: (root, args) => {
-      return Books.find({})
+    allBooks: async (root, args) => {
+      const books = await Book.find({}).populate('author')
+      return books
     },
-    allAuthors: (root, args) => {
-      return Author.find({})
+    allAuthors: async (root, args) => {
+      const authors = await Author.find({})
+      console.log(authors)
+      return authors
     },
     authorCount: () => Author.collection.countDocuments(),
     me: (root, args, context) => {
@@ -183,24 +186,36 @@ const resolvers = {
     }
   },
 
-  Author: {
-    bookCount: (root) => {
-      return Book.find({
-         author: { $in: root.name }
-      }).countDocuments()
-    }
-  },
-
   Mutation: {
-    addBook: async (root, args) => {
-      const book = new Book({ ...args })
-
-      const currentUser = context.currentUser
+    addBook: async (root, args, context) => {
+      /*const currentUser = context.currentUser
 
       if (!currentUser) {
         throw new AuthenticationError("not authenticated")
-      }
-  
+      }*/
+
+      let author = await Author.findOne({ name: args.author })
+      /*if (!author) {
+        author = new Author({ name: args.author, bookCount: 1 })
+        try {
+          await author.save()
+        } catch (error) {
+          throw new UserInputError(error.message, {
+            invalidArgs: args,
+          })
+        }
+      } else {
+        author.bookCount += 1
+        await author.save()
+      }*/
+
+      let book = new Book({
+        title: args.title,
+        published: args.published,
+        genres: args.genres,
+        author: author
+      })
+
       try {
         await book.save()
       } catch (error) {
@@ -208,6 +223,7 @@ const resolvers = {
           invalidArgs: args,
         })
       }
+    
       return book
     },
     editAuthor: async (root, args) => {
