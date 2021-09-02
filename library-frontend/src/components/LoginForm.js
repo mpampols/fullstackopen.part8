@@ -9,7 +9,7 @@ export const LOGIN = gql`
   }
 `
 
-const LoginForm = ({ setError, setToken }) => {
+const LoginForm = ({ setError, setToken, show }) => {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
 
@@ -27,14 +27,18 @@ const LoginForm = ({ setError, setToken }) => {
     }
   }, [result.data]) // eslint-disable-line
 
+  if (!show) {
+    return null
+  }
+
   const submit = async (event) => {
     event.preventDefault()
-
     login({ variables: { username, password } })
   }
 
   return (
     <div>
+      <h2>Login</h2>
       <form onSubmit={submit}>
         <div>
           username <input
