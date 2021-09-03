@@ -151,17 +151,17 @@ const typeDefs = gql`
       published: Int!
       genres: [String!]
     ): Book
-  
+
     editAuthor(
       name: String!
       setBornTo: Int!
     ): Author
-  
+
     createUser(
       username: String!
       favoriteGenre: String!
     ): User
-  
+
     login(
       username: String!
       password: String!
@@ -223,7 +223,7 @@ const resolvers = {
           invalidArgs: args,
         })
       }
-    
+
       return book
     },
     editAuthor: async (root, args, context) => {
@@ -238,7 +238,7 @@ const resolvers = {
       if (!author) {
         return null
       }
-      
+
       author.born = args.setBornTo
 
       try {
@@ -253,7 +253,7 @@ const resolvers = {
     },
     createUser: (root, args) => {
       const user = new User({ username: args.username })
-  
+
       return user.save()
         .catch(error => {
           throw new UserInputError(error.message, {
@@ -263,16 +263,16 @@ const resolvers = {
     },
     login: async (root, args) => {
       const user = await User.findOne({ username: args.username })
-  
+
       if ( !user || args.password !== 'secret' ) {
         throw new UserInputError("wrong credentials")
       }
-  
+
       const userForToken = {
         username: user.username,
         id: user._id,
       }
-  
+
       return { value: jwt.sign(userForToken, JWT_SECRET) }
     },
   }

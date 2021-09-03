@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { gql, useQuery } from '@apollo/client';
 
 export const ALL_BOOKS = gql`
@@ -6,6 +6,7 @@ export const ALL_BOOKS = gql`
     allBooks {
       title
       published
+      genres
       author {
         name
         born
@@ -16,6 +17,38 @@ export const ALL_BOOKS = gql`
 
 const Books = (props) => {
   const result = useQuery(ALL_BOOKS)
+  const [genre, setGenre] = useState(null)
+  const [genres, setGenres] = useState([])
+  const [selectedGenre, setSelectedGenre] = useState([])
+  const [books, setBooks] = useState([])
+  const [filteredBooks, setFilteredBooks] = useState([])
+
+  useEffect(() => {
+    if (result.data) {
+      const allBooks = result.data.allBooks
+      setBooks(allBooks)
+      let genres = ['All genres']
+      allBooks.forEach((element) => {
+        element.genres.forEach((g) => {
+          if (genres.indexOf(g) === -1) {
+            genres.push(g)
+          }
+        })
+      })
+      setGenres(genres)
+      setSelectedGenre('All genres')
+    }
+  }, [result])
+
+  useEffect(() => {
+    if (selectedGenre === 'All genres') {
+      setFilteredBooks(books)
+    } else {
+      setFilteredBooks(
+        books.filter((b) => b.genres.indexOf(selectedGenre) !== -1)
+      )
+    }
+  }, [books, selectedGenre])
 
   if (!props.show) {
     return null
@@ -25,11 +58,13 @@ const Books = (props) => {
     return <div>loading...</div>
   }
 
-  const books = result.data.allBooks
-
   return (
     <div>
       <h2>books</h2>
+
+      <div>
+        in genre
+      </div>
 
       <table>
         <tbody>
@@ -42,17 +77,21 @@ const Books = (props) => {
               published
             </th>
           </tr>
-          {books.map(a =>
+          {filteredBooks.map(a =>
             <tr key={a.title}>
               <td>{a.title}</td>
               <td>{a.author.name}</td>
               <td>{a.published}</td>
+              <td>{a.genres}</td>
             </tr>
           )}
         </tbody>
       </table>
-
-      
+      <div>
+      {genres.map(genre => 
+        <button key={genre} onClick={() => setSelectedGenre(genre)}>{genre}</button>
+      )}
+      </div>
     </div>
   )
 }
