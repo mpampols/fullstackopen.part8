@@ -62,9 +62,17 @@ const Books = (props) => {
     <div>
       <h2>books</h2>
 
+      {selectedGenre !== 'All genres' &&
       <div>
-        in genre
+         in genre {selectedGenre}
       </div>
+      }
+
+      {selectedGenre === 'All genres' &&
+      <div>
+         all genres
+      </div>
+      }
 
       <table>
         <tbody>
