@@ -1,12 +1,16 @@
 
 import React, { useState, useEffect } from 'react'
-import { useApolloClient } from '@apollo/client'
+import {
+  useQuery, useMutation, useSubscription, useApolloClient
+} from '@apollo/client'
 
 import Authors from './components/Authors'
 import Books from './components/Books'
 import NewBook from './components/NewBook'
 import LoginForm from './components/LoginForm'
 import Recommended from './components/Recommended'
+
+import { BOOK_ADDED } from './components/Books'
 
 const Notify = ({errorMessage}) => {
   if ( !errorMessage ) {
@@ -25,6 +29,12 @@ const App = () => {
   const [favouriteGenre, setFavouriteGenre] = useState(null)
   const [errorMessage, setErrorMessage] = useState(null)
   const client = useApolloClient()
+
+  useSubscription(BOOK_ADDED, {
+    onSubscriptionData: ({ subscriptionData }) => {
+      alert(`${subscriptionData.data.bookAdded.title} added successfully!`)
+    }
+  })
 
   useEffect(() => {
     const loggedUser = window.localStorage.getItem('library-user-token')

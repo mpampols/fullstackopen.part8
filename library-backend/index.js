@@ -9,6 +9,9 @@ const Author = require('./models/author')
 const Book = require('./models/book')
 const User = require('./models/user')
 
+const { PubSub } = require('graphql-subscriptions')
+const pubsub = new PubSub()
+
 const url = process.env.MONGODB_URI
 
 mongoose.set('useFindAndModify', false)
@@ -21,6 +24,7 @@ mongoose.connect(url, {
 }).catch((error) => {
   console.log('error connecting to MongoDB:', error.message)
 })
+mongoose.set('debug', true);
 
 let authors = [
   {
@@ -111,6 +115,10 @@ let books = [
 ]
 
 const typeDefs = gql`
+  type Subscription {
+    bookAdded: Book!
+  }
+
   type User {
     username: String!
     favoriteGenre: String!
@@ -177,7 +185,6 @@ const resolvers = {
     },
     allAuthors: async (root, args) => {
       const authors = await Author.find({})
-      console.log(authors)
       return authors
     },
     authorCount: () => Author.collection.countDocuments(),
@@ -188,14 +195,15 @@ const resolvers = {
 
   Mutation: {
     addBook: async (root, args, context) => {
-      /*const currentUser = context.currentUser
+      const currentUser = context.currentUser
 
       if (!currentUser) {
         throw new AuthenticationError("not authenticated")
-      }*/
+      }
 
       let author = await Author.findOne({ name: args.author })
-      /*if (!author) {
+
+      if (!author) {
         author = new Author({ name: args.author, bookCount: 1 })
         try {
           await author.save()
@@ -207,7 +215,7 @@ const resolvers = {
       } else {
         author.bookCount += 1
         await author.save()
-      }*/
+      }
 
       let book = new Book({
         title: args.title,
@@ -223,7 +231,7 @@ const resolvers = {
           invalidArgs: args,
         })
       }
-
+      pubsub.publish('BOOK_ADDED', { bookAdded: book })
       return book
     },
     editAuthor: async (root, args, context) => {
@@ -275,7 +283,13 @@ const resolvers = {
 
       return { value: jwt.sign(userForToken, JWT_SECRET) }
     },
-  }
+  },
+
+  Subscription: {
+    bookAdded: {
+      subscribe: () => pubsub.asyncIterator(['BOOK_ADDED'])
+    },
+  },
 }
 
 const server = new ApolloServer({
@@ -293,6 +307,7 @@ const server = new ApolloServer({
   }
 })
 
-server.listen().then(({ url }) => {
+server.listen().then(({ url, subscriptionsUrl }) => {
   console.log(`Server ready at ${url}`)
+  console.log(`Subscriptions ready at ${subscriptionsUrl}`)
 })
